@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VERIFY — The Peace & Chaos Game</title>
+<style>
+  :root{--ink:#17202a;--paper:#fffdf5;--blue:#355cde;--pink:#ff6b9d;--gold:#f6c445;--green:#58b889;--red:#e95b5b}
+  *{box-sizing:border-box}
+  body{margin:0;background:linear-gradient(135deg,#dff4ff,#fff4d7);font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:var(--ink)}
+  .wrap{max-width:1200px;margin:auto;padding:18px}
+  header{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap}
+  h1{margin:0;font-size:clamp(28px,5vw,48px);letter-spacing:2px}
+  .tag{background:#17202a;color:white;padding:8px 12px;border-radius:999px;font-weight:800}
+  .layout{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:16px;margin-top:14px}
+  .panel,.boardWrap{background:rgba(255,253,245,.94);border:3px solid var(--ink);border-radius:22px;box-shadow:7px 7px 0 #17202a;padding:14px}
+  .board{display:grid;grid-template-columns:repeat(8,1fr);gap:6px}
+  .cell{min-height:72px;border:2px solid #27313a;border-radius:12px;background:#fff;position:relative;padding:7px;font-size:12px;font-weight:800;overflow:hidden}
+  .cell:nth-child(4n){background:#f0f6ff}.cell.special{background:#fff0a8}.cell.bad{background:#ffd6d6}.cell.good{background:#d9f6e7}
+  .num{position:absolute;right:6px;top:4px;opacity:.55;font-size:11px}
+  .label{margin-top:17px;line-height:1.05}
+  .tokens{position:absolute;left:5px;bottom:5px;display:flex;gap:3px}
+  .token{width:20px;height:20px;border-radius:50%;border:2px solid #17202a;display:grid;place-items:center;color:white;font-size:10px}
+  .p1{background:var(--blue)}.p2{background:var(--pink)}
+  button{border:3px solid var(--ink);background:var(--gold);border-radius:14px;padding:12px 16px;font-weight:900;font-size:16px;box-shadow:3px 3px 0 var(--ink);cursor:pointer}
+  button:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;margin:10px 0}
+  .dice{font-size:44px;font-weight:900;text-align:center;background:#f7f7f7;border:3px dashed var(--ink);border-radius:18px;padding:12px}
+  .status{font-weight:800;line-height:1.4}
+  .player{padding:12px;border:2px solid var(--ink);border-radius:14px;margin:8px 0;background:white}
+  .player.active{outline:4px solid var(--gold)}
+  .stats{display:grid;grid-template-columns:1fr 1fr;gap:7px;font-size:13px}
+  .log{height:180px;overflow:auto;background:#111827;color:#e9f0ff;border-radius:14px;padding:10px;font:12px ui-monospace,monospace}
+  .rules{font-size:13px;line-height:1.45}
+  .legend{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+  .pill{padding:7px 9px;border-radius:10px;background:#eef1f4;font-size:12px;font-weight:800}
+  .small{opacity:.72;font-size:12px}
+  @media(max-width:850px){.layout{grid-template-columns:1fr}.cell{min-height:58px;font-size:10px}}
+</style>
+<link rel="manifest" href="./manifest.webmanifest"><meta name="theme-color" content="#17202a"></head>
+<body>
+<div class="wrap">
+<header>
+  <div><h1>VERIFY</h1><div class="small">The Peace & Chaos Game — digital prototype of the handwritten rules</div></div>
+  <div class="tag" id="turnTag">PLAYER 1'S TURN</div>
+</header>
+
+<div class="layout">
+  <section class="boardWrap">
+    <div class="board" id="board"></div>
+  </section>
+
+  <aside>
+    <div class="panel">
+      <div class="dice" id="dice">🎲</div>
+      <div class="controls">
+        <button id="roll">ROLL DICE</button>
+        <button id="new">NEW GAME</button>
+      </div>
+      <div class="status" id="status">Roll the dice to begin.</div>
+      <div id="players"></div>
+    </div>
+
+    <div class="panel" style="margin-top:14px">
+      <h3 style="margin:0 0 8px">Spaces & powers</h3>
+      <div class="legend">
+        <div class="pill">💗 LOVE — heart hat</div>
+        <div class="pill">✌️ PEACE — heal/clear chaos</div>
+        <div class="pill">⚡ SPEED — 2× next move</div>
+        <div class="pill">🎭 MASK — 20% speed boost</div>
+        <div class="pill">🧊 ICE — free ice</div>
+        <div class="pill">🍕 PIZZA — good/bad choice</div>
+        <div class="pill">🏠 FUN HOUSE — safe house</div>
+        <div class="pill">🕳️ ECLIPSE — shadow trap</div>
+        <div class="pill">✓ VERIFY — boss challenge</div>
+        <div class="pill">☹ FALSY — lose a turn</div>
+      </div>
+      <p class="rules"><b>Goal:</b> reach FINISH first. Landing on VERIFY starts a cartoon boss challenge. Winning can give the MASK; the MASK makes you move 10% faster in this prototype. ECLIPSE sends you into a shadowy setback. “Die” sends you back to START. The handwritten rules have a few unclear numbers, so this version uses sensible defaults that can be changed later.</p>
+    </div>
+
+    <div class="panel" style="margin-top:14px">
+      <h3 style="margin:0 0 8px">Game log</h3>
+      <div class="log" id="log"></div>
+    </div>
+  </aside>
+</div>
+</div>
+
+<script>
+const spaces = [
+["START","start"],["LOVE","good"],["PEACE","good"],["SPEED","good"],["FALSY","bad"],["ICE","good"],["PIZZA","special"],["MASK","good"],
+["VERIFY","special"],["ECLIPSE","bad"],["FUN HOUSE","good"],["6×6 DIE","special"],["LOVE","good"],["SPEED","good"],["FALSY","bad"],["ICE","good"],
+["PIZZA","special"],["VERIFY","special"],["PEACE","good"],["MASK","good"],["ECLIPSE","bad"],["FUN HOUSE","good"],["LOVE","good"],["SPEED","good"],
+["FALSY","bad"],["ICE","good"],["PIZZA","special"],["6×6 DIE","special"],["MASK","good"],["PEACE","good"],["VERIFY","special"],["ECLIPSE","bad"],
+["LOVE","good"],["SPEED","good"],["FUN HOUSE","good"],["FALSY","bad"],["ICE","good"],["PIZZA","special"],["MASK","good"],["PEACE","good"],
+["VERIFY","special"],["ECLIPSE","bad"],["LOVE","good"],["SPEED","good"],["FALSY","bad"],["ICE","good"],["PIZZA","special"],["MASK","good"],
+["FUN HOUSE","good"],["PEACE","good"],["VERIFY","special"],["ECLIPSE","bad"],["LOVE","good"],["SPEED","good"],["FALSY","bad"],["ICE","good"],
+["PIZZA","special"],["MASK","good"],["FUN HOUSE","good"],["PEACE","good"],["VERIFY","special"],["FINISH","finish"]
+];
+const players=[
+ {name:"PLAYER 1",pos:0,skip:0,speed:1,mask:false,heart:false,house:false},
+ {name:"PLAYER 2",pos:0,skip:0,speed:1,mask:false,heart:false,house:false}
+];
+let turn=0, locked=false;
+const icons={START:"🚩",LOVE:"💗",PEACE:"✌️",SPEED:"⚡",FALSY:"☹️",ICE:"🧊",PIZZA:"🍕",MASK:"🎭",VERIFY:"✓",ECLIPSE:"🌑","FUN HOUSE":"🏠","6×6 DIE":"6×6",FINISH:"🏁"};
+
+function draw(){
+ const b=document.getElementById("board"); b.innerHTML="";
+ spaces.forEach((s,i)=>{
+   const d=document.createElement("div"); d.className="cell "+s[1];
+   const ps=players.map((p,n)=>p.pos===i?`<span class="token p${n+1}">${n+1}</span>`:"").join("");
+   d.innerHTML=`<span class="num">${i}</span><div class="label">${icons[s[0]]||""} ${s[0]}</div><div class="tokens">${ps}</div>`;
+   b.appendChild(d);
+ });
+ document.getElementById("turnTag").textContent=players[turn].name+"'S TURN";
+ const pc=document.getElementById("players"); pc.innerHTML="";
+ players.forEach((p,i)=>{
+  const x=document.createElement("div"); x.className="player "+(i===turn?"active":"");
+  x.innerHTML=`<b>${p.name}</b><div class="stats">
+   <span>Space: ${p.pos}</span><span>Skip: ${p.skip}</span>
+   <span>Speed: ${p.speed.toFixed(1)}×</span><span>Mask: ${p.mask?"YES":"NO"}</span>
+   <span>Heart: ${p.heart?"YES":"NO"}</span><span>House: ${p.house?"YES":"NO"}</span></div>`;
+  pc.appendChild(x);
+ });
+}
+function log(t){const l=document.getElementById("log");l.innerHTML+=`<div>› ${t}</div>`;l.scrollTop=l.scrollHeight}
+function status(t){document.getElementById("status").textContent=t}
+function move(p,steps){
+ p.pos=Math.min(spaces.length-1,p.pos+steps);
+ draw();
+}
+function effect(p,name){
+ if(name==="START") return;
+ if(name==="LOVE"){p.heart=true; status("LOVE: you found the heart hat! 💗"); log(`${p.name} found LOVE and got the heart hat.`)}
+ if(name==="PEACE"){p.skip=0; status("PEACE: chaos cleared. ✌️"); log(`${p.name} found PEACE and cleared their setback.`)}
+ if(name==="SPEED"){p.speed=2; status("SPEED: 2× movement for your next move! ⚡"); log(`${p.name} got SPEED.`)}
+ if(name==="FALSY"){p.skip=1; status("FALSY: you are confused and lose your next turn. ☹️"); log(`${p.name} hit FALSY and loses a turn.`)}
+ if(name==="ICE"){status("ICE: free ice! 🧊");log(`${p.name} got free ICE.`)}
+ if(name==="PIZZA"){
+   const good=Math.random()<.5;
+   if(good){p.speed=Math.max(p.speed,1.5);status("PIZZA: good slice! +50% speed. 🍕");log(`${p.name} picked the GOOD pizza.`)}
+   else{p.skip=1;status("PIZZA: bad slice! Lose a turn. 🍕");log(`${p.name} picked the BAD pizza.`)}
+ }
+ if(name==="MASK"){p.mask=true;p.speed=Math.max(p.speed,1.1);status("MASK: you are 10% faster. 🎭");log(`${p.name} got the MASK and is 10% faster.`)}
+ if(name==="VERIFY"){
+   locked=true; const win=Math.random()<.65;
+   if(win){p.mask=true;p.speed=Math.max(p.speed,1.1);status("VERIFY defeated! You got the MASK. ✓🎭");log(`${p.name} beat VERIFY and took the MASK.`)}
+   else{p.skip=1;status("VERIFY got you! Lose a turn. ✓");log(`${p.name} lost the VERIFY challenge.`)}
+   locked=false;
+ }
+ if(name==="ECLIPSE"){p.pos=Math.max(0,p.pos-5);status("ECLIPSE: the shadows pulled you back 5 spaces. 🌑");log(`${p.name} was caught by ECLIPSE.`)}
+ if(name==="6×6 DIE"){
+   if(Math.random()<.25){p.pos=0;status("6×6 DIE: unlucky — back to START!");log(`${p.name} rolled the special die and went back to START.`)}
+   else{status("6×6 DIE: you survived the special roll!");log(`${p.name} survived the 6×6 DIE.`)}
+ }
+ if(name==="FUN HOUSE"){p.house=true;status("FUN HOUSE: you have a house! 🏠");log(`${p.name} claimed a FUN HOUSE.`)}
+ draw();
+}
+document.getElementById("roll").onclick=()=>{
+ if(locked)return;
+ const p=players[turn];
+ if(p.skip>0){p.skip--;log(`${p.name} loses this turn.`);status(`${p.name} is stuck for this turn.`);turn=1-turn;draw();return;}
+ const die=1+Math.floor(Math.random()*6);
+ document.getElementById("dice").textContent=["⚀","⚁","⚂","⚃","⚄","⚅"][die-1];
+ const steps=Math.max(1,Math.round(die*p.speed));
+ p.speed=1;
+ const before=p.pos; move(p,steps);
+ log(`${p.name} rolled ${die} and moved ${p.pos-before} spaces.`);
+ const landed=spaces[p.pos][0]; effect(p,landed);
+ if(p.pos===spaces.length-1){status(`${p.name} WINS! 🏆`);log(`${p.name} reached FINISH and wins!`);document.getElementById("roll").disabled=true;return}
+ turn=1-turn; draw();
+};
+document.getElementById("new").onclick=()=>{
+ players.forEach(p=>Object.assign(p,{pos:0,skip:0,speed:1,mask:false,heart:false,house:false}));
+ turn=0;document.getElementById("roll").disabled=false;document.getElementById("dice").textContent="🎲";
+ document.getElementById("log").innerHTML="";log("New game started.");status("Roll the dice to begin.");draw();
+};
+draw(); log("Welcome to VERIFY. First player to FINISH wins.");
+</script>
+<script>if ("serviceWorker" in navigator && location.protocol !== "file:") navigator.serviceWorker.register("./sw.js").catch(()=>{});</script></body>
+</html>

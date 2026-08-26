@@ -1,0 +1,9 @@
+{
+  "name": "VERIFY — The Peace & Chaos Game",
+  "short_name": "VERIFY",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#fffdf5",
+  "theme_color": "#17202a",
+  "description": "A playable digital version of a handwritten family board game."
+}
